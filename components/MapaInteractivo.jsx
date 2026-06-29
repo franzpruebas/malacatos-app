@@ -4,27 +4,66 @@ import { useRouter } from 'next/navigation'
 import maplibregl from 'maplibre-gl'
 import { createClient } from '@/lib/supabase-browser'
 
-// Colores por estado visual
 const COLOR_ESTADO = {
-  libre:          '#9E9E9E',  // gris
-  en_proceso_propio: '#FFC107',  // amarillo (este alumno)
-  en_proceso_otro:   '#F44336',  // rojo (otro alumno)
-  completado:     '#4CAF50',  // verde
+  libre:             '#9E9E9E',
+  en_proceso_propio: '#FFC107',
+  en_proceso_otro:   '#F44336',
+  completado:        '#4CAF50',
 }
 
 export default function MapaInteractivo({ usuario, perfil }) {
-  const mapRef    = useRef(null)
-  const mapInst   = useRef(null)
+  const mapRef   = useRef(null)
+  const mapInst  = useRef(null)
   const markerRef = useRef(null)
-  const router    = useRouter()
-  const supabase  = createClient()
+  const router   = useRouter()
+  const supabase = createClient()
 
-  const [gpsActivo, setGpsActivo] = useState(false)
-  const [posicion,  setPosicion]  = useState(null)
-  const [cargando,  setCargando]  = useState(false)
-  const [mensaje,   setMensaje]   = useState(null)
+  const [cargando, setCargando] = useState(false)
+  const [mensaje,  setMensaje]  = useState(null)
+  const [zoom,     setZoom]     = useState(13)
 
-  // ── Inicializar mapa ────────────────────────────────────────
+  // ── Cargar predios según viewport ───────────────────────────
+  const cargarPredios = useCallback(async () => {
+    const map = mapInst.current
+    if (!map) return
+    const z = map.getZoom()
+    setZoom(z)
+    if (z < 13) return          // demasiado alejado, no cargar
+
+    const b = map.getBounds()
+    setCargando(true)
+
+    const { data, error } = await supabase.rpc('get_predios_viewport', {
+      p_xmin: b.getWest(),
+      p_ymin: b.getSouth(),
+      p_xmax: b.getEast(),
+      p_ymax: b.getNorth(),
+    })
+
+    if (error) { setCargando(false); return }
+
+    const features = (data || []).map((p, idx) => ({
+      type: 'Feature',
+      id: idx,
+      geometry: p.geom_json,
+      properties: {
+        id:         p.id,
+        clave_cata: p.clave_cata,
+        tipo_predi: p.tipo_predi,
+        estado:     p.estado,
+        estado_visual:
+          p.estado === 'en_proceso'
+            ? (p.alumno_id === usuario.id ? 'en_proceso_propio' : 'en_proceso_otro')
+            : p.estado,
+      },
+    }))
+
+    const source = map.getSource('predios')
+    if (source) source.setData({ type: 'FeatureCollection', features })
+    setCargando(false)
+  }, [supabase, usuario])
+
+  // ── Inicializar mapa ─────────────────────────────────────────
   useEffect(() => {
     if (mapInst.current) return
 
@@ -35,9 +74,7 @@ export default function MapaInteractivo({ usuario, perfil }) {
         sources: {
           satellite: {
             type: 'raster',
-            tiles: [
-              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-            ],
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
             tileSize: 256,
             attribution: 'Esri World Imagery',
           },
@@ -45,20 +82,18 @@ export default function MapaInteractivo({ usuario, perfil }) {
         layers: [{ id: 'satellite', type: 'raster', source: 'satellite' }],
         glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       },
-      center: [-79.22, -4.22],  // Centro aproximado Malacatos
+      center: [-79.22, -4.22],
       zoom: 13,
     })
 
     mapInst.current.addControl(new maplibregl.NavigationControl(), 'top-right')
 
-    // Fuente y capas para predios (vacías inicialmente)
     mapInst.current.on('load', () => {
       mapInst.current.addSource('predios', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       })
 
-      // Relleno
       mapInst.current.addLayer({
         id: 'predios-fill',
         type: 'fill',
@@ -66,48 +101,45 @@ export default function MapaInteractivo({ usuario, perfil }) {
         paint: {
           'fill-color': [
             'match', ['get', 'estado_visual'],
-            'libre',            COLOR_ESTADO.libre,
-            'en_proceso_propio',COLOR_ESTADO.en_proceso_propio,
-            'en_proceso_otro',  COLOR_ESTADO.en_proceso_otro,
-            'completado',       COLOR_ESTADO.completado,
-            '#CCCCCC'
+            'libre',             COLOR_ESTADO.libre,
+            'en_proceso_propio', COLOR_ESTADO.en_proceso_propio,
+            'en_proceso_otro',   COLOR_ESTADO.en_proceso_otro,
+            'completado',        COLOR_ESTADO.completado,
+            '#CCCCCC',
           ],
           'fill-opacity': 0.55,
         },
       })
 
-      // Borde
       mapInst.current.addLayer({
         id: 'predios-outline',
         type: 'line',
         source: 'predios',
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 0.8,
-          'line-opacity': 0.6,
-        },
+        paint: { 'line-color': '#ffffff', 'line-width': 0.8, 'line-opacity': 0.6 },
       })
 
-      // Highlight al hover
       mapInst.current.addLayer({
         id: 'predios-hover',
         type: 'fill',
         source: 'predios',
         paint: {
           'fill-color': '#ffffff',
-          'fill-opacity': [
-            'case', ['boolean', ['feature-state', 'hover'], false], 0.25, 0
-          ],
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.25, 0],
         },
       })
+
+      // Cargar predios al iniciar
+      cargarPredios()
     })
+
+    // Recargar al mover o cambiar zoom
+    mapInst.current.on('moveend', cargarPredios)
 
     // Hover
     let hoveredId = null
     mapInst.current.on('mousemove', 'predios-fill', (e) => {
-      if (hoveredId !== null) {
+      if (hoveredId !== null)
         mapInst.current.setFeatureState({ source: 'predios', id: hoveredId }, { hover: false })
-      }
       hoveredId = e.features[0].id
       mapInst.current.setFeatureState({ source: 'predios', id: hoveredId }, { hover: true })
       mapInst.current.getCanvas().style.cursor = 'pointer'
@@ -121,131 +153,71 @@ export default function MapaInteractivo({ usuario, perfil }) {
     })
 
     return () => mapInst.current?.remove()
-  }, [])
+  }, [cargarPredios])
 
-  // ── Cargar predios por GPS ───────────────────────────────────
-  const cargarPredios = useCallback(async (lat, lon) => {
-    if (!mapInst.current) return
-    setCargando(true)
-
-    const { data, error } = await supabase.rpc('get_predios_cercanos', {
-      lat, lon, radio_m: 500
-    })
-
-    if (error) { setCargando(false); return }
-
-    const features = (data || []).map((p, idx) => ({
-      type: 'Feature',
-      id: idx,
-      geometry: p.geom_json,
-      properties: {
-        id: p.id,
-        clave_cata: p.clave_cata,
-        tipo_predi: p.tipo_predi,
-        estado: p.estado,
-        estado_visual:
-          p.estado === 'en_proceso'
-            ? (p.alumno_id === usuario.id ? 'en_proceso_propio' : 'en_proceso_otro')
-            : p.estado,
-      },
-    }))
-
-    const source = mapInst.current.getSource('predios')
-    if (source) {
-      source.setData({ type: 'FeatureCollection', features })
-    }
-
-    setCargando(false)
-  }, [supabase, usuario])
-
-  // ── Actualizar predios cuando cambia la posición ────────────
+  // ── Click en predio ──────────────────────────────────────────
   useEffect(() => {
-    if (posicion) {
-      cargarPredios(posicion.lat, posicion.lon)
-    }
-  }, [posicion, cargarPredios])
-
-  // ── Click en predio ─────────────────────────────────────────
-  useEffect(() => {
-    if (!mapInst.current) return
+    const map = mapInst.current
+    if (!map) return
 
     const handleClick = async (e) => {
       if (!e.features?.length) return
-      const props = e.features[0].properties
-      const { id, clave_cata, estado_visual } = props
+      const { id, clave_cata, estado_visual } = e.features[0].properties
 
       if (estado_visual === 'completado') {
-        mostrarMensaje(`Predio ${clave_cata} ya fue levantado ✓`, 'verde')
+        mostrarMensaje(`Predio ${clave_cata} ya fue levantado`, 'verde')
         return
       }
-
       if (estado_visual === 'en_proceso_otro') {
         mostrarMensaje('Este predio está siendo levantado por otro alumno', 'rojo')
         return
       }
-
       if (estado_visual === 'en_proceso_propio') {
         router.push(`/encuesta/${id}`)
         return
       }
 
-      // Estado libre → asignar
+      // Libre → asignar
       setCargando(true)
       const { data: resultado, error } = await supabase.rpc('asignar_predio', { predio_id: id })
-
       if (error || resultado !== 'ok') {
         mostrarMensaje('El predio acaba de ser tomado por otro alumno', 'rojo')
-        if (posicion) cargarPredios(posicion.lat, posicion.lon)
+        cargarPredios()
         setCargando(false)
         return
       }
-
       setCargando(false)
       router.push(`/encuesta/${id}`)
     }
 
-    mapInst.current.on('click', 'predios-fill', handleClick)
-    return () => mapInst.current?.off('click', 'predios-fill', handleClick)
-  }, [posicion, cargarPredios, router, supabase])
+    map.on('click', 'predios-fill', handleClick)
+    return () => map?.off('click', 'predios-fill', handleClick)
+  }, [cargarPredios, router, supabase])
 
-  // ── Activar GPS ─────────────────────────────────────────────
-  function activarGPS() {
+  // ── GPS opcional — solo centra el mapa ──────────────────────
+  function irAMiUbicacion() {
     if (!navigator.geolocation) {
       mostrarMensaje('Tu dispositivo no tiene GPS', 'rojo')
       return
     }
-
-    setGpsActivo(true)
-    navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude
-        const lon = pos.coords.longitude
-        setPosicion({ lat, lon })
+        const { latitude: lat, longitude: lon } = pos.coords
+        mapInst.current?.flyTo({ center: [lon, lat], zoom: 16 })
 
-        // Mover mapa a la posición
-        mapInst.current?.flyTo({ center: [lon, lat], zoom: 15 })
-
-        // Marcador de posición
         if (markerRef.current) {
           markerRef.current.setLngLat([lon, lat])
         } else {
           const el = document.createElement('div')
-          el.className = 'gps-marker'
-          el.style.cssText = `
-            width: 16px; height: 16px; border-radius: 50%;
-            background: #2196F3; border: 3px solid white;
-            box-shadow: 0 0 8px rgba(33,150,243,0.6);
-          `
+          el.style.cssText = `width:16px;height:16px;border-radius:50%;
+            background:#2196F3;border:3px solid white;
+            box-shadow:0 0 8px rgba(33,150,243,0.6);`
           markerRef.current = new maplibregl.Marker({ element: el })
             .setLngLat([lon, lat])
             .addTo(mapInst.current)
         }
       },
-      (err) => {
-        console.error('GPS error:', err)
-        mostrarMensaje('No se pudo obtener la ubicación', 'rojo')
-        setGpsActivo(false)
-      },
+      () => mostrarMensaje('No se pudo obtener la ubicación', 'rojo'),
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
@@ -263,7 +235,6 @@ export default function MapaInteractivo({ usuario, perfil }) {
 
   return (
     <div className="relative w-full" style={{ height: '100dvh' }}>
-      {/* Mapa */}
       <div ref={mapRef} className="w-full h-full" />
 
       {/* Header */}
@@ -274,23 +245,26 @@ export default function MapaInteractivo({ usuario, perfil }) {
           </p>
           <p className="text-xs text-gray-500">Paralelo {perfil?.paralelo}</p>
         </div>
-        <button
-          onClick={cerrarSesion}
-          className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1"
-        >
+        <button onClick={cerrarSesion} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1">
           Salir
         </button>
       </div>
 
-      {/* Botón GPS */}
-      {!gpsActivo && (
-        <button
-          onClick={activarGPS}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 bg-green-700 text-white px-6 py-3 rounded-full font-semibold shadow-lg text-sm flex items-center gap-2"
-        >
-          <span>📍</span> Activar ubicación para ver predios
-        </button>
+      {/* Aviso zoom bajo */}
+      {zoom < 13 && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-black/60 text-white text-xs px-4 py-2 rounded-full">
+          Acerca el mapa para ver los predios
+        </div>
       )}
+
+      {/* Botón GPS opcional */}
+      <button
+        onClick={irAMiUbicacion}
+        className="absolute bottom-8 right-4 z-10 bg-white border border-gray-300 rounded-full w-11 h-11 flex items-center justify-center shadow-lg text-xl"
+        title="Ir a mi ubicación"
+      >
+        📍
+      </button>
 
       {/* Loading */}
       {cargando && (
@@ -308,13 +282,13 @@ export default function MapaInteractivo({ usuario, perfil }) {
       )}
 
       {/* Leyenda */}
-      <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur rounded-xl p-3 shadow text-xs space-y-1">
+      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur rounded-xl p-3 shadow text-xs space-y-1">
         {[
-          ['libre',             COLOR_ESTADO.libre,            'Libre'],
-          ['en_proceso_propio', COLOR_ESTADO.en_proceso_propio,'Tuyo (en proceso)'],
-          ['en_proceso_otro',   COLOR_ESTADO.en_proceso_otro,  'Otro alumno'],
-          ['completado',        COLOR_ESTADO.completado,       'Completado'],
-        ].map(([, color, label]) => (
+          [COLOR_ESTADO.libre,             'Libre'],
+          [COLOR_ESTADO.en_proceso_propio, 'Tuyo (en proceso)'],
+          [COLOR_ESTADO.en_proceso_otro,   'Otro alumno'],
+          [COLOR_ESTADO.completado,        'Completado'],
+        ].map(([color, label]) => (
           <div key={label} className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: color }} />
             <span className="text-gray-700">{label}</span>
