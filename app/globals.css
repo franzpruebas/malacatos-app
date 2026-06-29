@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MapLibre GL */
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Prevenir zoom en inputs en iOS (accesibilidad móvil) */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Input base reutilizable en formulario */
+.input {
+  @apply w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm
+    focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+    bg-white;
+}
