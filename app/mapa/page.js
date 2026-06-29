@@ -13,7 +13,5 @@ export default async function MapaPage() {
     .eq('id', user.id)
     .single()
 
-  if (perfil?.role === 'admin') redirect('/admin')
-
   return <MapaLoader usuario={user} perfil={perfil} />
 }

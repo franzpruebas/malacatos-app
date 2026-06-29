@@ -243,14 +243,33 @@ export default function MapaInteractivo({ usuario, perfil }) {
       {/* Header */}
       <div className="absolute top-0 left-0 right-12 z-10 bg-white/90 backdrop-blur px-4 py-2 flex items-center justify-between shadow">
         <div>
-          <p className="font-semibold text-green-800 text-sm leading-tight">
-            {perfil?.nombre?.split(' ').slice(0, 2).join(' ')}
-          </p>
-          <p className="text-xs text-gray-500">Paralelo {perfil?.paralelo}</p>
+          {perfil?.role === 'admin' ? (
+            <>
+              <p className="font-semibold text-green-800 text-sm leading-tight">Administrador</p>
+              <p className="text-xs text-gray-500">Vista de mapa</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-green-800 text-sm leading-tight">
+                {perfil?.nombre?.split(' ').slice(0, 2).join(' ')}
+              </p>
+              <p className="text-xs text-gray-500">Paralelo {perfil?.paralelo}</p>
+            </>
+          )}
         </div>
-        <button onClick={cerrarSesion} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1">
-          Salir
-        </button>
+        <div className="flex items-center gap-2">
+          {perfil?.role === 'admin' && (
+            <button
+              onClick={() => router.push('/admin')}
+              className="text-xs text-green-700 hover:text-green-900 font-medium px-2 py-1"
+            >
+              ← Panel
+            </button>
+          )}
+          <button onClick={cerrarSesion} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1">
+            Salir
+          </button>
+        </div>
       </div>
 
       {zoom < 15 && (

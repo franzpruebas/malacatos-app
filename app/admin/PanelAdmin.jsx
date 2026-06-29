@@ -2,17 +2,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import ResultadosGlobales from '@/components/admin/ResultadosGlobales'
 
-const TABS = ['Resumen', 'Predios', 'Encuestas']
+const TABS = ['Resumen', 'Predios', 'Encuestas', 'Resultados', 'Mapa']
 
 export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, adminId }) {
   const router = useRouter()
   const supabase = createClient()
-  const [liberando,   setLiberando]   = useState(null)
-  const [filtroPred,  setFiltroPred]  = useState('todos')
-  const [tab,         setTab]         = useState('Resumen')
-  const [filtroParal, setFiltroParal] = useState('todos')
-  const [busqueda,    setBusqueda]    = useState('')
+  const [liberando,     setLiberando]     = useState(null)
+  const [eliminando,    setEliminando]    = useState(null)
+  const [filtroPred,    setFiltroPred]    = useState('todos')
+  const [tab,           setTab]           = useState('Resumen')
+  const [filtroParal,   setFiltroParal]   = useState('todos')
+  const [busqueda,      setBusqueda]      = useState('')
 
   async function liberarPredio(predioId) {
     setLiberando(predioId)
@@ -21,9 +23,22 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
     router.refresh()
   }
 
+  async function eliminarEncuesta(predioId, clave) {
+    if (!confirm(`¿Eliminar la encuesta del predio ${clave}?\nEsto libera el predio y borra todos los datos.`)) return
+    setEliminando(predioId)
+    await supabase.rpc('admin_eliminar_encuesta', { p_predio_id: predioId })
+    setEliminando(null)
+    router.refresh()
+  }
+
   async function cerrarSesion() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  function handleTab(t) {
+    if (t === 'Mapa') { router.push('/mapa'); return }
+    setTab(t)
   }
 
   const prediosFiltrados = prediosActivos.filter(p =>
@@ -33,9 +48,10 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
   const paralelos = [...new Set(encuestasCompletas.map(e => e.alumno?.paralelo).filter(Boolean))].sort()
 
   const encuestasFiltradas = encuestasCompletas.filter(e => {
-    const parOk  = filtroParal === 'todos' || e.alumno?.paralelo === filtroParal
-    const busOk  = !busqueda   || (e.p01_codigo_ficha || '').toLowerCase().includes(busqueda.toLowerCase())
-                                || (e.alumno?.nombre   || '').toLowerCase().includes(busqueda.toLowerCase())
+    const parOk = filtroParal === 'todos' || e.alumno?.paralelo === filtroParal
+    const busOk = !busqueda
+      || (e.p01_codigo_ficha || '').toLowerCase().includes(busqueda.toLowerCase())
+      || (e.alumno?.nombre   || '').toLowerCase().includes(busqueda.toLowerCase())
     return parOk && busOk
   })
 
@@ -52,15 +68,19 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
           <button onClick={cerrarSesion} className="text-green-200 text-sm hover:text-white">Salir</button>
         </div>
         {/* Tabs */}
-        <div className="flex gap-2 max-w-4xl mx-auto mt-3">
+        <div className="flex flex-wrap gap-1 max-w-4xl mx-auto mt-3">
           {TABS.map(t => (
             <button
               key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1 rounded-full text-sm font-medium transition-all
-                ${tab === t ? 'bg-white text-green-800' : 'text-green-200 hover:text-white'}`}
+              onClick={() => handleTab(t)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-all
+                ${tab === t && t !== 'Mapa'
+                  ? 'bg-white text-green-800'
+                  : t === 'Mapa'
+                    ? 'bg-green-600 text-white hover:bg-green-500'
+                    : 'text-green-200 hover:text-white'}`}
             >
-              {t}
+              {t === 'Mapa' ? '🗺 Mapa' : t}
               {t === 'Encuestas' && encuestasCompletas.length > 0 && (
                 <span className="ml-1.5 bg-green-600 text-white text-xs px-1.5 py-0.5 rounded-full">
                   {encuestasCompletas.length}
@@ -176,7 +196,7 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
                     <th className="px-4 py-2 text-left">Clave catastral</th>
                     <th className="px-4 py-2 text-left">Alumno</th>
                     <th className="px-4 py-2 text-center">Estado</th>
-                    <th className="px-4 py-2 text-center">Acción</th>
+                    <th className="px-4 py-2 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -194,24 +214,24 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
                           {p.estado === 'completado' ? 'Completado' : 'En proceso'}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-center flex items-center justify-center gap-2">
-                        {p.estado === 'completado' && (
-                          <button
-                            onClick={() => router.push(`/encuesta/${p.id}/ver`)}
-                            className="text-xs text-green-600 hover:text-green-800 underline"
-                          >
-                            Ver
-                          </button>
-                        )}
-                        {p.estado === 'en_proceso' && (
-                          <button
-                            onClick={() => liberarPredio(p.id)}
-                            disabled={liberando === p.id}
-                            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40 underline"
-                          >
-                            {liberando === p.id ? 'Liberando...' : 'Liberar'}
-                          </button>
-                        )}
+                      <td className="px-4 py-2 text-center">
+                        <div className="flex items-center justify-center gap-3">
+                          {p.estado === 'completado' && (
+                            <button
+                              onClick={() => router.push(`/encuesta/${p.id}/ver`)}
+                              className="text-xs text-green-600 hover:text-green-800 underline"
+                            >Ver</button>
+                          )}
+                          {p.estado === 'en_proceso' && (
+                            <button
+                              onClick={() => liberarPredio(p.id)}
+                              disabled={liberando === p.id}
+                              className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40 underline"
+                            >
+                              {liberando === p.id ? 'Liberando...' : 'Liberar'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -231,7 +251,6 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
         {/* ── TAB ENCUESTAS ───────────────────────────────────── */}
         {tab === 'Encuestas' && (
           <>
-            {/* Filtros */}
             <div className="flex flex-wrap gap-2">
               <input
                 type="search"
@@ -246,17 +265,13 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
                 className="border rounded-lg px-3 py-2 text-sm text-gray-600 bg-white"
               >
                 <option value="todos">Todos los paralelos</option>
-                {paralelos.map(p => (
-                  <option key={p} value={p}>Paralelo {p}</option>
-                ))}
+                {paralelos.map(p => <option key={p} value={p}>Paralelo {p}</option>)}
               </select>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b flex items-center justify-between">
-                <h2 className="font-semibold text-gray-800">
-                  Encuestas completadas
-                </h2>
+                <h2 className="font-semibold text-gray-800">Encuestas completadas</h2>
                 <span className="text-sm text-gray-400">{encuestasFiltradas.length} registros</span>
               </div>
               <div className="overflow-x-auto">
@@ -268,13 +283,12 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
                       <th className="px-4 py-2 text-center">Par.</th>
                       <th className="px-4 py-2 text-left">Sector</th>
                       <th className="px-4 py-2 text-left">Enviado</th>
-                      <th className="px-4 py-2 text-center">Ver</th>
+                      <th className="px-4 py-2 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {encuestasFiltradas.map(e => (
-                      <tr key={e.predio_id} className="hover:bg-green-50 cursor-pointer"
-                          onClick={() => router.push(`/encuesta/${e.predio_id}/ver`)}>
+                      <tr key={e.predio_id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 font-mono text-xs text-gray-600">
                           {e.p01_codigo_ficha || '—'}
                         </td>
@@ -286,10 +300,20 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
                         <td className="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">
                           {e.enviada_en ? new Date(e.enviada_en).toLocaleDateString('es-EC') : '—'}
                         </td>
-                        <td className="px-4 py-2 text-center">
-                          <span className="text-green-600 hover:text-green-800 text-xs font-medium">
-                            Ver →
-                          </span>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center justify-center gap-3">
+                            <button
+                              onClick={() => router.push(`/encuesta/${e.predio_id}/ver`)}
+                              className="text-xs text-green-600 hover:text-green-800 underline"
+                            >Ver</button>
+                            <button
+                              onClick={() => eliminarEncuesta(e.predio_id, e.p01_codigo_ficha)}
+                              disabled={eliminando === e.predio_id}
+                              className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40 underline"
+                            >
+                              {eliminando === e.predio_id ? 'Eliminando...' : 'Eliminar'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -305,6 +329,11 @@ export default function PanelAdmin({ stats, prediosActivos, encuestasCompletas, 
               </div>
             </div>
           </>
+        )}
+
+        {/* ── TAB RESULTADOS ──────────────────────────────────── */}
+        {tab === 'Resultados' && (
+          <ResultadosGlobales encuestasCompletas={encuestasCompletas} />
         )}
 
       </div>

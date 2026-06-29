@@ -41,10 +41,10 @@ export default async function AdminPage() {
     profiles: profilesMap[p.alumno_id] || null,
   }))
 
-  // Encuestas completadas con alumno
+  // Encuestas completadas con todos los campos (para resultados globales)
   const { data: encuestasRaw } = await supabase
     .from('encuestas')
-    .select('predio_id, alumno_id, enviada_en, p01_codigo_ficha, p05_sector, p08_tipologia')
+    .select('*')
     .eq('completa', true)
     .order('enviada_en', { ascending: false })
 
