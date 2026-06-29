@@ -9,3 +9,4 @@ const FormularioEncuesta = dynamic(
 export default function EncuestaLoader(props) {
   return <FormularioEncuesta {...props} />
 }
+

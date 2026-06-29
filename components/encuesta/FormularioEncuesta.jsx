@@ -21,7 +21,7 @@ const SECCIONES = [
   { num: 7, titulo: 'Territorio',         componente: SeccionG },
 ]
 
-export default function FormularioEncuesta({ predioId, claveCata, usuario, perfil }) {
+export default function FormularioEncuesta({ predioId, claveCata, centroidLat, centroidLon, usuario, perfil }) {
   const router  = useRouter()
   const supabase = createClient()
 
@@ -34,11 +34,13 @@ export default function FormularioEncuesta({ predioId, claveCata, usuario, perfi
     defaultValues: {
       p01_codigo_ficha:      claveCata,
       p02_nombre_observador: perfil?.nombre || '',
-      p18_elementos_recreativos: [],
-      p25_servicios_basicos:     [],
+      p03_latitud:           centroidLat ?? null,
+      p03_longitud:          centroidLon ?? null,
+      p18_elementos_recreativos:    [],
+      p25_servicios_basicos:        [],
       p26_infraestructura_reciente: [],
-      p27_urbanizacion_entorno: [],
-      p30_tipo_similitud:   [],
+      p27_urbanizacion_entorno:     [],
+      p30_tipo_similitud:           [],
     }
   })
 

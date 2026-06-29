@@ -7,7 +7,6 @@
 
 html, body {
   height: 100%;
-  overflow: hidden;
 }
 
 /* Prevenir zoom en inputs en iOS (accesibilidad móvil) */

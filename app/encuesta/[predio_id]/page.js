@@ -12,7 +12,7 @@ export default async function EncuestaPage({ params }) {
   // Verificar que el predio pertenece a este alumno
   const { data: predio } = await supabase
     .from('predios')
-    .select('id, clave_cata, estado, alumno_id')
+    .select('id, clave_cata, estado, alumno_id, lat, lon')
     .eq('id', predio_id)
     .single()
 
@@ -34,6 +34,8 @@ export default async function EncuestaPage({ params }) {
     <EncuestaLoader
       predioId={predio_id}
       claveCata={predio.clave_cata}
+      centroidLat={predio.lat}
+      centroidLon={predio.lon}
       usuario={user}
       perfil={perfil}
     />

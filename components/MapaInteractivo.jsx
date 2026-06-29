@@ -237,7 +237,7 @@ export default function MapaInteractivo({ usuario, perfil }) {
   }
 
   return (
-    <div className="relative w-full" style={{ height: '100dvh' }}>
+    <div className="relative w-full" style={{ height: '100dvh', overflow: 'hidden' }}>
       <div ref={mapRef} className="w-full h-full" />
 
       {/* Header */}

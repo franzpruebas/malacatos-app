@@ -22,9 +22,10 @@ const ANTIGUEDAD = [
   { value: 'mas_20',  label: 'Más de 20 años (anterior a 2005)' },
 ]
 
-export default function SeccionA({ register, setValue, errors, onSiguiente, guardando }) {
+export default function SeccionA({ register, watch, setValue, errors, onSiguiente, guardando }) {
   const [obteniendo, setObteniendo] = useState(false)
 
+  // Capturar posición del observador y guardar en los campos de latitud/longitud
   function capturarGPS() {
     if (!navigator.geolocation) return
     setObteniendo(true)
@@ -38,6 +39,9 @@ export default function SeccionA({ register, setValue, errors, onSiguiente, guar
       { enableHighAccuracy: true }
     )
   }
+
+  const lat = watch('p03_latitud')
+  const lon = watch('p03_longitud')
 
   return (
     <div className="space-y-6">
@@ -55,42 +59,55 @@ export default function SeccionA({ register, setValue, errors, onSiguiente, guar
         />
       </Campo>
 
-      {/* P2 */}
+      {/* P2 — nombre del alumno (readonly, viene del perfil) */}
       <Campo label="2. Nombre del observador" error={errors.p02_nombre_observador}>
         <input
           {...register('p02_nombre_observador', { required: 'Requerido' })}
-          className="input"
-          placeholder="Tu nombre completo"
+          className="input bg-gray-50"
+          readOnly
         />
       </Campo>
 
-      {/* P3 GPS */}
+      {/* P3 — Coordenadas del centroide del predio */}
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">
-          3. Coordenadas GPS <span className="text-red-500">*</span>
+        <p className="text-sm font-medium text-gray-700 mb-1">
+          3. Coordenadas geográficas <span className="text-red-500">*</span>
         </p>
-        <button
-          type="button"
-          onClick={capturarGPS}
-          disabled={obteniendo}
-          className="w-full border-2 border-dashed border-green-400 rounded-xl py-3 text-green-700 font-medium text-sm flex items-center justify-center gap-2 hover:bg-green-50"
-        >
-          {obteniendo ? '⏳ Obteniendo GPS...' : '📍 Capturar ubicación actual'}
-        </button>
-        <div className="grid grid-cols-2 gap-2 mt-2">
+        <p className="text-xs text-gray-400 mb-2">
+          Centroide del predio catastral. Usa el botón para reemplazar con tu posición GPS si lo necesitas.
+        </p>
+
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <Campo label="Latitud" error={errors.p03_latitud}>
             <input
               {...register('p03_latitud', { required: 'Requerido', valueAsNumber: true })}
-              type="number" step="0.000001" className="input" placeholder="-4.220000"
+              type="number" step="0.000001" className="input"
+              placeholder="-4.220000"
             />
           </Campo>
           <Campo label="Longitud" error={errors.p03_longitud}>
             <input
               {...register('p03_longitud', { required: 'Requerido', valueAsNumber: true })}
-              type="number" step="0.000001" className="input" placeholder="-79.220000"
+              type="number" step="0.000001" className="input"
+              placeholder="-79.220000"
             />
           </Campo>
         </div>
+
+        {lat && lon && (
+          <p className="text-xs text-green-700 mb-2">
+            📍 {Number(lat).toFixed(6)}, {Number(lon).toFixed(6)}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={capturarGPS}
+          disabled={obteniendo}
+          className="w-full border border-dashed border-gray-300 rounded-xl py-2.5 text-gray-500 text-sm flex items-center justify-center gap-2 hover:bg-gray-50"
+        >
+          {obteniendo ? '⏳ Obteniendo GPS...' : '📍 Reemplazar con mi posición GPS (opcional)'}
+        </button>
       </div>
 
       {/* P4 */}
@@ -104,7 +121,9 @@ export default function SeccionA({ register, setValue, errors, onSiguiente, guar
 
       {/* P5 Sector */}
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">5. Sector o barrio <span className="text-red-500">*</span></p>
+        <p className="text-sm font-medium text-gray-700 mb-2">
+          5. Sector o barrio <span className="text-red-500">*</span>
+        </p>
         <div className="grid grid-cols-2 gap-2">
           {SECTORES.map(s => (
             <label key={s} className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 cursor-pointer has-[:checked]:bg-green-50 has-[:checked]:border-green-500">
@@ -115,7 +134,7 @@ export default function SeccionA({ register, setValue, errors, onSiguiente, guar
         </div>
       </div>
 
-      {/* P6 Tipo vía */}
+      {/* P6 */}
       <RadioGroup
         label="6. Tipo de vía de acceso principal"
         name="p06_tipo_via"
@@ -124,7 +143,7 @@ export default function SeccionA({ register, setValue, errors, onSiguiente, guar
         requerido
       />
 
-      {/* P7 Antigüedad */}
+      {/* P7 */}
       <RadioGroup
         label="7. Antigüedad estimada de construcción"
         name="p07_antiguedad"
