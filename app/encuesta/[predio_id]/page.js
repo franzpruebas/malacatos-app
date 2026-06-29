@@ -26,7 +26,7 @@ export default async function EncuestaPage({ params }) {
 
   const { data: perfil } = await supabase
     .from('profiles')
-    .select('nombre, paralelo')
+    .select('nombre, paralelo, role')
     .eq('id', user.id)
     .single()
 

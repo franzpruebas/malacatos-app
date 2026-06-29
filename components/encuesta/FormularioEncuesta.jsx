@@ -53,16 +53,25 @@ export default function FormularioEncuesta({ predioId, claveCata, centroidLat, c
         .eq('predio_id', predioId)
         .single()
 
-      if (!data) return
+      if (data) {
+        Object.entries(data).forEach(([key, val]) => {
+          if (val !== null && key.startsWith('p')) setValue(key, val)
+        })
+        setSeccionActual(data.seccion_actual || 1)
+      }
 
-      // Restaurar todos los valores del borrador
-      Object.entries(data).forEach(([key, val]) => {
-        if (val !== null && key.startsWith('p')) setValue(key, val)
-      })
-      setSeccionActual(data.seccion_actual || 1)
+      // Siempre re-aplicar valores del servidor (no editables por el alumno)
+      setValue('p01_codigo_ficha',      claveCata)
+      setValue('p02_nombre_observador',
+        perfil?.nombre?.trim()
+          ? perfil.nombre
+          : (perfil?.role === 'admin' ? 'Administrador' : 'Sin nombre')
+      )
+      if (centroidLat) setValue('p03_latitud',  centroidLat)
+      if (centroidLon) setValue('p03_longitud', centroidLon)
     }
     cargarBorrador()
-  }, [predioId, supabase, setValue])
+  }, [predioId, supabase, setValue, claveCata, perfil, centroidLat, centroidLon])
 
   async function guardarSeccion(datosSeccion, seccionCompletada) {
     setGuardando(true)
