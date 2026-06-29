@@ -16,7 +16,9 @@ export default function LoginPage() {
     setError('')
 
     const supabase = createClient()
-    const email = `${cedula}@malacatos.local`
+    const email = cedula === 'admin'
+      ? 'admin@malacatos.local'
+      : `${cedula}@malacatos.local`
 
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -57,11 +59,10 @@ export default function LoginPage() {
             </label>
             <input
               type="text"
-              inputMode="numeric"
-              pattern="[0-9]{10}"
+              inputMode="text"
               maxLength={10}
               value={cedula}
-              onChange={e => setCedula(e.target.value.replace(/\D/g, ''))}
+              onChange={e => setCedula(e.target.value.replace(/[^0-9a-z]/gi, ''))}
               className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="0000000000"
               required
@@ -90,7 +91,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || cedula.length !== 10}
+            disabled={loading || (cedula !== 'admin' && cedula.length !== 10)}
             className="w-full bg-green-700 text-white rounded-xl px-4 py-3 font-semibold text-base hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
