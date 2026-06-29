@@ -22,6 +22,30 @@ export default function MapaInteractivo({ usuario, perfil }) {
   const [mensaje,  setMensaje]  = useState(null)
   const [zoom,     setZoom]     = useState(13)
 
+  // WebGL no disponible (VMs, sesiones remotas, browsers sin GPU)
+  if (!maplibregl.supported()) {
+    return (
+      <div className="min-h-screen bg-green-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm text-center">
+          <p className="text-4xl mb-4">🗺️</p>
+          <h2 className="font-bold text-gray-800 text-lg mb-2">Mapa no disponible</h2>
+          <p className="text-sm text-gray-500">
+            Este dispositivo o navegador no soporta WebGL, necesario para mostrar el mapa interactivo.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Abre la app desde <strong>Chrome o Safari en un celular</strong> para el levantamiento de campo.
+          </p>
+          <button
+            onClick={async () => { await createClient().auth.signOut(); router.push('/login') }}
+            className="mt-6 text-sm text-gray-400 underline"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // ── Cargar predios según viewport ───────────────────────────
   const cargarPredios = useCallback(async () => {
     const map = mapInst.current
