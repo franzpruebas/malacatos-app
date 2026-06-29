@@ -1,11 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
-import dynamic from 'next/dynamic'
-
-const FormularioEncuesta = dynamic(
-  () => import('@/components/encuesta/FormularioEncuesta'),
-  { ssr: false }
-)
+import EncuestaLoader from './EncuestaLoader'
 
 export default async function EncuestaPage({ params }) {
   const { predio_id } = await params
@@ -36,7 +31,7 @@ export default async function EncuestaPage({ params }) {
     .single()
 
   return (
-    <FormularioEncuesta
+    <EncuestaLoader
       predioId={predio_id}
       claveCata={predio.clave_cata}
       usuario={user}
