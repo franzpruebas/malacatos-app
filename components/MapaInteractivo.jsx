@@ -29,7 +29,7 @@ export default function MapaInteractivo({ usuario, perfil }) {
     if (!map) return
     const z = map.getZoom()
     setZoom(z)
-    if (z < 13) return
+    if (z < 15) return
 
     const b = map.getBounds()
     setCargando(true)
@@ -91,7 +91,7 @@ export default function MapaInteractivo({ usuario, perfil }) {
           glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         },
         center: [-79.22, -4.22],
-        zoom: 13,
+        zoom: 15,
       })
     } catch {
       setWebglError(true); return
@@ -162,7 +162,7 @@ export default function MapaInteractivo({ usuario, perfil }) {
       if (!e.features?.length) return
       const { id, clave_cata, estado_visual } = e.features[0].properties
       if (estado_visual === 'completado') {
-        mostrarMensaje(`Predio ${clave_cata} ya fue levantado`, 'verde'); return
+        router.push(`/encuesta/${id}/ver`); return
       }
       if (estado_visual === 'en_proceso_otro') {
         mostrarMensaje('Este predio está siendo levantado por otro alumno', 'rojo'); return
@@ -253,9 +253,9 @@ export default function MapaInteractivo({ usuario, perfil }) {
         </button>
       </div>
 
-      {zoom < 13 && (
+      {zoom < 15 && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">
-          Acerca el mapa para ver los predios
+          Acerca más el mapa para ver los predios
         </div>
       )}
 

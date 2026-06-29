@@ -41,5 +41,33 @@ export default async function AdminPage() {
     profiles: profilesMap[p.alumno_id] || null,
   }))
 
-  return <PanelAdmin stats={stats} prediosActivos={prediosActivos} adminId={user.id} />
+  // Encuestas completadas con alumno
+  const { data: encuestasRaw } = await supabase
+    .from('encuestas')
+    .select('predio_id, alumno_id, enviada_en, p01_codigo_ficha, p05_sector, p08_tipologia')
+    .eq('completa', true)
+    .order('enviada_en', { ascending: false })
+
+  const alumnoIdsEnc = [...new Set((encuestasRaw || []).map(e => e.alumno_id).filter(Boolean))]
+  let profilesEncMap = {}
+  if (alumnoIdsEnc.length) {
+    const { data: profsEnc } = await supabase
+      .from('profiles')
+      .select('id, nombre, paralelo')
+      .in('id', alumnoIdsEnc)
+    profilesEncMap = Object.fromEntries((profsEnc || []).map(p => [p.id, p]))
+  }
+  const encuestasCompletas = (encuestasRaw || []).map(e => ({
+    ...e,
+    alumno: profilesEncMap[e.alumno_id] || null,
+  }))
+
+  return (
+    <PanelAdmin
+      stats={stats}
+      prediosActivos={prediosActivos}
+      encuestasCompletas={encuestasCompletas}
+      adminId={user.id}
+    />
+  )
 }
